@@ -15,6 +15,7 @@ members = [
     "shared",
     "identity",
     "oracle-network",
+    "base-token",
 ]
 
 [workspace.package]
