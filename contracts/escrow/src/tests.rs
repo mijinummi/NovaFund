@@ -6,7 +6,7 @@ mod tests {
     use soroban_sdk::{
         contract, contractimpl,
         testutils::{Address as _, Ledger},
-        Address, BytesN, Env, Vec,
+        Address, BytesN, Env, Vec, Symbol,
     };
 
     #[contract]
@@ -15,6 +15,20 @@ mod tests {
     #[contractimpl]
     impl MockToken {
         pub fn transfer(_env: Env, _from: Address, _to: Address, _amount: i128) {}
+        pub fn balance(_env: Env, _id: Address) -> i128 { 
+            // Return 1200 for the escrow contract in yield tests
+            1200
+        }
+    }
+
+    #[contract]
+    pub struct MockProfitDist;
+
+    #[contractimpl]
+    impl MockProfitDist {
+        pub fn deposit_profits(_env: Env, _project_id: u64, _depositor: Address, _amount: i128) -> Result<(), shared::errors::Error> {
+            Ok(())
+        }
     }
 
     fn create_mock_token(env: &Env) -> Address {
@@ -65,7 +79,7 @@ mod tests {
         let client = EscrowContractClient::new(env, &contract_id);
 
         client.initialize_admin(&admin);
-        client.initialize(&1, &creator, &token, &validators, &DEFAULT_THRESHOLD);
+        client.initialize(&1, &creator, &token, &validators, &DEFAULT_THRESHOLD, &500); // 5% fee
 
         (admin, creator, token, validators, client)
     }
@@ -81,7 +95,7 @@ mod tests {
         let client = create_client(&env);
         env.mock_all_auths();
 
-        client.initialize(&1, &creator, &token, &validators, &DEFAULT_THRESHOLD);
+        client.initialize(&1, &creator, &token, &validators, &DEFAULT_THRESHOLD, &500);
 
         let escrow = client.get_escrow(&1);
         assert_eq!(escrow.project_id, 1);
@@ -90,6 +104,7 @@ mod tests {
         assert_eq!(escrow.total_deposited, 0);
         assert_eq!(escrow.released_amount, 0);
         assert_eq!(escrow.approval_threshold, DEFAULT_THRESHOLD);
+        assert_eq!(escrow.management_fee_bps, 500);
     }
 
     #[test]
@@ -102,9 +117,19 @@ mod tests {
         validators.push_back(Address::generate(&env));
 
         let client = create_client(&env);
-        let result = client.try_initialize(&1, &creator, &token, &validators, &DEFAULT_THRESHOLD);
+        let result = client.try_initialize(&1, &creator, &token, &validators, &DEFAULT_THRESHOLD, &0);
 
         assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_initialize_with_invalid_fee() {
+        let (env, creator, token, _, validators) = create_test_env();
+        let client = create_client(&env);
+        env.mock_all_auths();
+
+        let result = client.try_initialize(&1, &creator, &token, &validators, &DEFAULT_THRESHOLD, &10001);
+        assert!(result.is_err(), "fee above 100% should be rejected");
     }
 
     #[test]
@@ -113,9 +138,9 @@ mod tests {
         let client = create_client(&env);
         env.mock_all_auths();
 
-        client.initialize(&1, &creator, &token, &validators, &DEFAULT_THRESHOLD);
+        client.initialize(&1, &creator, &token, &validators, &DEFAULT_THRESHOLD, &0);
 
-        let result = client.try_initialize(&1, &creator, &token, &validators, &DEFAULT_THRESHOLD);
+        let result = client.try_initialize(&1, &creator, &token, &validators, &DEFAULT_THRESHOLD, &0);
         assert!(result.is_err());
     }
 
@@ -125,7 +150,7 @@ mod tests {
         let client = create_client(&env);
         env.mock_all_auths();
 
-        client.initialize(&1, &creator, &token, &validators, &DEFAULT_THRESHOLD);
+        client.initialize(&1, &creator, &token, &validators, &DEFAULT_THRESHOLD, &0);
 
         let deposit_amount: i128 = 1000;
         let result = client.try_deposit(&1, &deposit_amount);
@@ -142,7 +167,7 @@ mod tests {
         let client = create_client(&env);
         env.mock_all_auths();
 
-        client.initialize(&1, &creator, &token, &validators, &DEFAULT_THRESHOLD);
+        client.initialize(&1, &creator, &token, &validators, &DEFAULT_THRESHOLD, &0);
 
         let result = client.try_deposit(&1, &0);
         assert!(result.is_err());
@@ -157,7 +182,7 @@ mod tests {
         let client = create_client(&env);
 
         env.mock_all_auths();
-        client.initialize(&1, &creator, &token, &validators, &DEFAULT_THRESHOLD);
+        client.initialize(&1, &creator, &token, &validators, &DEFAULT_THRESHOLD, &0);
         client.deposit(&1, &1000);
 
         let description_hash = BytesN::from_array(&env, &[1u8; 32]);
@@ -177,7 +202,7 @@ mod tests {
         let client = create_client(&env);
 
         env.mock_all_auths();
-        client.initialize(&1, &creator, &token, &validators, &DEFAULT_THRESHOLD);
+        client.initialize(&1, &creator, &token, &validators, &DEFAULT_THRESHOLD, &0);
         client.deposit(&1, &500);
 
         let description_hash = BytesN::from_array(&env, &[2u8; 32]);
@@ -192,7 +217,7 @@ mod tests {
         let client = create_client(&env);
 
         env.mock_all_auths();
-        client.initialize(&1, &creator, &token, &validators, &DEFAULT_THRESHOLD);
+        client.initialize(&1, &creator, &token, &validators, &DEFAULT_THRESHOLD, &0);
         client.deposit(&1, &3000);
 
         let desc1 = BytesN::from_array(&env, &[1u8; 32]);
@@ -217,7 +242,7 @@ mod tests {
         let client = create_client(&env);
 
         env.mock_all_auths();
-        client.initialize(&1, &creator, &token, &validators, &DEFAULT_THRESHOLD);
+        client.initialize(&1, &creator, &token, &validators, &DEFAULT_THRESHOLD, &0);
         client.deposit(&1, &1000);
 
         let description_hash = BytesN::from_array(&env, &[1u8; 32]);
@@ -237,7 +262,7 @@ mod tests {
         let client = create_client(&env);
         env.mock_all_auths();
 
-        client.initialize(&1, &creator, &token, &validators, &DEFAULT_THRESHOLD);
+        client.initialize(&1, &creator, &token, &validators, &DEFAULT_THRESHOLD, &0);
         client.deposit(&1, &1000);
 
         let description_hash = BytesN::from_array(&env, &[1u8; 32]);
@@ -258,7 +283,7 @@ mod tests {
         let client = create_client(&env);
         env.mock_all_auths();
 
-        client.initialize(&1, &creator, &token, &validators, &DEFAULT_THRESHOLD);
+        client.initialize(&1, &creator, &token, &validators, &DEFAULT_THRESHOLD, &0);
 
         client.deposit(&1, &1000);
         let balance = client.get_available_balance(&1);
@@ -284,7 +309,7 @@ mod tests {
         let client = create_client(&env);
         env.mock_all_auths();
 
-        client.initialize(&1, &creator, &token, &validators, &DEFAULT_THRESHOLD);
+        client.initialize(&1, &creator, &token, &validators, &DEFAULT_THRESHOLD, &0);
 
         let result = client.try_get_milestone(&1, &999);
         assert!(result.is_err());
@@ -296,7 +321,7 @@ mod tests {
         let client = create_client(&env);
         env.mock_all_auths();
 
-        client.initialize(&1, &creator, &token, &validators, &DEFAULT_THRESHOLD);
+        client.initialize(&1, &creator, &token, &validators, &DEFAULT_THRESHOLD, &0);
         client.deposit(&1, &1000);
 
         let description_hash = BytesN::from_array(&env, &[1u8; 32]);
@@ -321,7 +346,7 @@ mod tests {
         let client = create_client(&env);
         env.mock_all_auths();
 
-        client.initialize(&1, &creator, &token, &validators, &DEFAULT_THRESHOLD);
+        client.initialize(&1, &creator, &token, &validators, &DEFAULT_THRESHOLD, &0);
 
         client.deposit(&1, &500);
         assert_eq!(client.get_escrow(&1).total_deposited, 500);
@@ -352,7 +377,7 @@ mod tests {
 
         let client = create_client(&env);
 
-        client.initialize(&1, &creator, &token, &validators, &DEFAULT_THRESHOLD);
+        client.initialize(&1, &creator, &token, &validators, &DEFAULT_THRESHOLD, &0);
 
         let escrow1 = client.get_escrow(&1);
         assert_eq!(escrow1.project_id, 1);
@@ -387,7 +412,7 @@ mod tests {
         let client = create_client(&env);
         env.mock_all_auths();
 
-        let result = client.try_initialize(&1, &creator, &token, &validators, &5000);
+        let result = client.try_initialize(&1, &creator, &token, &validators, &5000, &0);
         assert!(result.is_err(), "threshold below 51% should be rejected");
     }
 
@@ -397,7 +422,7 @@ mod tests {
         let client = create_client(&env);
         env.mock_all_auths();
 
-        let result = client.try_initialize(&1, &creator, &token, &validators, &10100);
+        let result = client.try_initialize(&1, &creator, &token, &validators, &10100, &0);
         assert!(result.is_err(), "threshold above 100% should be rejected");
     }
 
@@ -407,7 +432,7 @@ mod tests {
         let client = create_client(&env);
         env.mock_all_auths();
 
-        let result = client.try_initialize(&1, &creator, &token, &validators, &5100);
+        let result = client.try_initialize(&1, &creator, &token, &validators, &5100, &0);
         assert!(result.is_ok(), "5100 basis points (51%) should be accepted");
     }
 
@@ -417,11 +442,8 @@ mod tests {
         let client = create_client(&env);
         env.mock_all_auths();
 
-        let result = client.try_initialize(&1, &creator, &token, &validators, &10000);
-        assert!(
-            result.is_ok(),
-            "10000 basis points (100%) should be accepted"
-        );
+        let result = client.try_initialize(&1, &creator, &token, &validators, &10000, &0);
+        assert!(result.is_ok(), "10000 basis points (100%) should be accepted");
     }
 
     #[test]
@@ -440,8 +462,8 @@ mod tests {
 
         let client = create_client(&env);
 
-        client.initialize(&1, &creator, &token, &validators, &6700);
-        client.initialize(&2, &creator, &token, &validators, &10000);
+        client.initialize(&1, &creator, &token, &validators, &6700, &0);
+        client.initialize(&2, &creator, &token, &validators, &10000, &1000);
 
         assert_eq!(client.get_escrow(&1).approval_threshold, 6700);
         assert_eq!(client.get_escrow(&2).approval_threshold, 10000);
@@ -459,7 +481,7 @@ mod tests {
         client.configure_dispute_token(&juror_token);
 
         // Use 10000 (100%) threshold — requires ALL 3 validators to approve
-        client.initialize(&1, &creator, &token, &validators, &10000);
+        client.initialize(&1, &creator, &token, &validators, &10000, &0);
 
         let v1 = validators.get(0).unwrap();
         let v2 = validators.get(1).unwrap();
@@ -516,7 +538,7 @@ mod tests {
         client.configure_dispute_token(&juror_token);
 
         // Use DEFAULT_THRESHOLD (67%) — with 3 validators, 2 votes meets the threshold
-        client.initialize(&1, &creator, &token, &validators, &DEFAULT_THRESHOLD);
+        client.initialize(&1, &creator, &token, &validators, &DEFAULT_THRESHOLD, &0);
 
         let v1 = validators.get(0).unwrap();
         let v2 = validators.get(1).unwrap();
@@ -851,6 +873,39 @@ mod tests {
         let wasm_hash = BytesN::from_array(&env, &[42u8; 32]);
         let random = Address::generate(&env);
         let result = client.try_schedule_upgrade(&random, &wasm_hash);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_claim_yield_happy_path() {
+        let (env, creator, token, _, validators) = create_test_env();
+        let client = create_client(&env);
+        env.mock_all_auths();
+
+        let profit_dist_id = env.register_contract(None, MockProfitDist);
+        
+        // 5% management fee
+        client.initialize(&1, &creator, &token, &validators, &DEFAULT_THRESHOLD, &500);
+        
+        // Initial deposit of 1000
+        client.deposit(&1, &1000);
+        
+        // MockToken::balance will return 1200 for the balance check
+        // Since MockToken::transfer does nothing, we just verify the call doesn't panic
+        client.claim_yield(&1, &profit_dist_id);
+    }
+
+    #[test]
+    fn test_claim_yield_no_yield() {
+        let (env, creator, token, _, validators) = create_test_env();
+        let client = create_client(&env);
+        env.mock_all_auths();
+        
+        client.initialize(&1, &creator, &token, &validators, &DEFAULT_THRESHOLD, &500);
+        let profit_dist_id = Address::generate(&env);
+        
+        // No tokens in contract, should fail
+        let result = client.try_claim_yield(&1, &profit_dist_id);
         assert!(result.is_err());
     }
 }

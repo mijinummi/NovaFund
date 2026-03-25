@@ -10,7 +10,13 @@ use shared::{
     },
     MAX_APPROVAL_THRESHOLD, MIN_APPROVAL_THRESHOLD,
 };
-use soroban_sdk::{contract, contractimpl, token::TokenClient, Address, BytesN, Env, IntoVal, Vec};
+use soroban_sdk::{contract, contractimpl, token::TokenClient, Address, BytesN, Env, IntoVal, Vec, Symbol};
+
+// Interface for ProfitDistribution
+#[soroban_sdk::contractclient(name = "ProfitDistributionClient")]
+pub trait ProfitDistributionTrait {
+    fn deposit_profits(env: Env, project_id: u64, depositor: Address, amount: i128) -> Result<(), shared::errors::Error>;
+}
 
 mod storage;
 mod validation;
@@ -49,11 +55,16 @@ impl EscrowContract {
         token: Address,
         validators: Vec<Address>,
         approval_threshold: u32,
+        management_fee_bps: u32,
     ) -> Result<(), Error> {
         creator.require_auth();
 
         // Validate inputs
         if (validators.len() as u32) < MIN_VALIDATORS {
+            return Err(Error::InvInput);
+        }
+
+        if management_fee_bps > 10000 {
             return Err(Error::InvInput);
         }
 
@@ -77,6 +88,7 @@ impl EscrowContract {
             released_amount: 0,
             validators,
             approval_threshold,
+            management_fee_bps,
         };
 
         // Store escrow
@@ -1240,6 +1252,64 @@ impl EscrowContract {
     /// Get pending upgrade info, if any.
     pub fn get_pending_upgrade(env: Env) -> Option<PendingUpgrade> {
         storage::get_pending_upgrade(&env)
+    }
+
+    /// Claim excess yield from the escrow contract
+    /// Yield = Balance - (TotalDeposited - ReleasedAmount)
+    pub fn claim_yield(
+        env: Env,
+        project_id: u64,
+        profit_dist_contract: Address,
+    ) -> Result<(), Error> {
+        let mut escrow = get_escrow(&env, project_id)?;
+        escrow.creator.require_auth();
+
+        if is_paused(&env) {
+            return Err(Error::Paused);
+        }
+
+        // Calculate currently required funds
+        let required_funds = escrow
+            .total_deposited
+            .checked_sub(escrow.released_amount)
+            .ok_or(Error::InvInput)?;
+
+        // Get actual contract balance
+        let token_client = TokenClient::new(&env, &escrow.token);
+        let actual_balance = token_client.balance(&env.current_contract_address());
+
+        // Calculate yield
+        if actual_balance <= required_funds {
+            return Err(Error::NoClaim);
+        }
+        let total_yield = actual_balance.checked_sub(required_funds).ok_or(Error::InvInput)?;
+
+        // Split yield
+        let fee_amount = (total_yield * (escrow.management_fee_bps as i128)) / 10000;
+        let investor_amount = total_yield.checked_sub(fee_amount).ok_or(Error::InvInput)?;
+
+        // 1. Distribute fee to creator
+        if fee_amount > 0 {
+            token_client.transfer(&env.current_contract_address(), &escrow.creator, &fee_amount);
+        }
+
+        // 2. Distribute remainder to investors via ProfitDistribution
+        if investor_amount > 0 {
+            let profit_dist_client = ProfitDistributionClient::new(&env, &profit_dist_contract);
+            // Transfer to profit distribution contract
+            token_client.transfer(&env.current_contract_address(), &profit_dist_contract, &investor_amount);
+            
+            // Notify profit distribution contract
+            let _ = profit_dist_client.deposit_profits(&project_id, &env.current_contract_address(), &investor_amount);
+        }
+
+        // Emit yield event
+        env.events().publish(
+            (Symbol::new(&env, "yield_claimed"),),
+            (project_id, total_yield, fee_amount, investor_amount),
+        );
+
+        Ok(())
     }
 }
 

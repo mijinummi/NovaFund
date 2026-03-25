@@ -9,7 +9,7 @@ use soroban_sdk::{
 use shared::{
     constants::{
         MAX_PROJECT_DURATION, MIN_CONTRIBUTION, MIN_FUNDING_GOAL, MIN_PROJECT_DURATION,
-        RESUME_TIME_DELAY, UPGRADE_TIME_LOCK_SECS,
+        RESUME_TIME_DELAY, UPGRADE_TIME_LOCK_SECS, KYC_TIER_1_LIMIT,
     },
     errors::Error,
     events::{
@@ -28,6 +28,7 @@ use crate::rwa_metadata::{read_rwa_metadata_cid, write_rwa_metadata_cid};
 #[soroban_sdk::contractclient(name = "IdentityContractClient")]
 pub trait IdentityContractTrait {
     fn is_verified(env: Env, user: Address, jurisdiction: Jurisdiction) -> bool;
+    fn get_tier(env: Env, user: Address, jurisdiction: Jurisdiction) -> u32;
 }
 
 /// Project status enumeration
@@ -226,16 +227,25 @@ impl ProjectLaunch {
                 .get::<_, Address>(&DataKey::IdentityContract)
             {
                 let identity_client = IdentityContractClient::new(&env, &identity_contract);
-                let mut is_verified = false;
+                let mut user_tier = 0;
                 for jurisdiction in jurisdictions.iter() {
-                    if identity_client.is_verified(&contributor, &jurisdiction) {
-                        is_verified = true;
-                        break;
+                    let tier = identity_client.get_tier(&contributor, &jurisdiction);
+                    if tier > user_tier {
+                        user_tier = tier;
                     }
                 }
-                if !is_verified {
+                
+                if user_tier == 0 {
                     return Err(Error::Unauthorized);
                 }
+
+                if user_tier == 1 {
+                    let total_contributed = Self::get_user_contribution(env.clone(), project_id, contributor.clone());
+                    if total_contributed + amount > KYC_TIER_1_LIMIT {
+                        return Err(Error::Unauthorized);
+                    }
+                }
+                // Tier 2 is unlimited
             } else {
                 // If jurisdictions are required but no identity contract is set, fail safe.
                 return Err(Error::Unauthorized);
@@ -1319,5 +1329,74 @@ mod tests {
         assert!(client.get_pending_upgrade().is_some());
         client.cancel_upgrade(&admin);
         assert!(client.get_pending_upgrade().is_none());
+    }
+
+    #[test]
+    fn test_contribute_tiered_kyc() {
+        let env = Env::default();
+        env.mock_all_auths();
+
+        let contract_id = env.register_contract(None, ProjectLaunch);
+        let client = ProjectLaunchClient::new(&env, &contract_id);
+
+        let identity_contract_id = env.register_contract(None, identity::IdentityContract);
+        let identity_client = identity::IdentityContractClient::new(&env, &identity_contract_id);
+
+        let admin = Address::generate(&env);
+        let creator = Address::generate(&env);
+        let contributor_t1 = Address::generate(&env);
+        let contributor_t2 = Address::generate(&env);
+        let contributor_unverified = Address::generate(&env);
+
+        client.initialize(&admin);
+        client.set_identity_contract(&identity_contract_id);
+        identity_client.initialize(&admin);
+
+        // Register token
+        let token_admin = Address::generate(&env);
+        let (token, _token_client, token_admin_client) = create_token_contract(&env, &token_admin);
+        let metadata_hash = Bytes::from_slice(&env, b"QmHash123");
+
+        // Create project with jurisdiction requirement
+        env.ledger().set_timestamp(1000000);
+        let deadline = 1000000 + MIN_PROJECT_DURATION + 86400;
+        let mut jurisdictions = soroban_sdk::Vec::new(&env);
+        jurisdictions.push_back(Jurisdiction::Global); // Use global for simplicity
+
+        let project_id = client.create_project(
+            &creator,
+            &MIN_FUNDING_GOAL,
+            &deadline,
+            &token,
+            &metadata_hash,
+            &Some(jurisdictions),
+        );
+
+        // Mint tokens
+        token_admin_client.mint(&contributor_t1, &100_000000000);
+        token_admin_client.mint(&contributor_t2, &200_000000000);
+        token_admin_client.mint(&contributor_unverified, &100_000000000);
+
+        // 1. Unverified user should fail
+        let result = client.try_contribute(&project_id, &contributor_unverified, &MIN_CONTRIBUTION);
+        assert!(result.is_err());
+
+        // 2. Verify contributor_t1 as Tier 1
+        let proof = Bytes::from_slice(&env, &[1, 2, 3]);
+        let public_inputs = Bytes::from_slice(&env, &[0]);
+        identity_client.verify_identity(&contributor_t1, &Jurisdiction::Global, &proof, &public_inputs, &1);
+
+        // Tier 1 contribution within limit should succeed
+        client.contribute(&project_id, &contributor_t1, &KYC_TIER_1_LIMIT); 
+
+        // Next contribution should exceed limit
+        let result = client.try_contribute(&project_id, &contributor_t1, &1);
+        assert!(result.is_err());
+
+        // 3. Verify contributor_t2 as Tier 2
+        identity_client.verify_identity(&contributor_t2, &Jurisdiction::Global, &proof, &public_inputs, &2);
+
+        // Tier 2 should have no limit (within project goals)
+        client.contribute(&project_id, &contributor_t2, &(KYC_TIER_1_LIMIT + 1)); 
     }
 }
