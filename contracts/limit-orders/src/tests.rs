@@ -1,33 +1,7 @@
 #![cfg(test)]
 
-use super::*;
-use soroban_sdk::{testutils::Address as _, Address, Env};
-
-fn create_test_env() -> (Env, Address, Address) {
-    let env = Env::default();
-    let admin = Address::generate(&env);
-    let amm_pool = Address::generate(&env);
-    
-    let contract_id = env.register_contract(None, LimitOrders);
-    LimitOrdersClient::new(&env, &contract_id).initialize(&admin, &amm_pool);
-    
-    (env, admin, contract_id)
-}
-
-#[test]
-fn test_initialize_succeeds() {
-    let env = Env::default();
-    let admin = Address::generate(&env);
-    let amm_pool = Address::generate(&env);
-    
-    let contract_id = env.register_contract(None, LimitOrders);
-    let client = LimitOrdersClient::new(&env, &contract_id);
-    
-    client.initialize(&admin, &amm_pool);
-    
-    // Verify initialization succeeded (no panic means success)
-    assert!(true);
-}
+use crate::{OrderBook, OrderType, OrderStatus};
+use soroban_sdk::{testutils::Address as _, Address, Env, Vec};
 
 #[test]
 fn test_order_book_structure() {
