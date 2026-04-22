@@ -19,6 +19,7 @@ import { ProjectModule } from './project/project.module';
 import { StellarModule } from './stellar/stellar.module';
 import { OracleModule } from './oracle/oracle.module';
 import { GraphQLRateLimitModule } from './graphql/graphql-rate-limit.module';
+import { ShortlinkModule } from './shortlink/shortlink.module';
 
 @Module({
   imports: [
@@ -45,6 +46,7 @@ import { GraphQLRateLimitModule } from './graphql/graphql-rate-limit.module';
     VerificationModule,
     ProjectModule,
     OracleModule,
+    ShortlinkModule,
   ],
   controllers: [AppController, UserController],
   providers: [AppService],

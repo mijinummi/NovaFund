@@ -53,6 +53,7 @@ model Project {
   // Relations
   contributions Contribution[]
   milestones    Milestone[]
+  shortlinks    Shortlink[]
 
   @@map("projects")
 }
@@ -311,4 +312,19 @@ model TokenPrice {
 
   @@index([symbol, fetchedAt])
   @@map("token_prices")
+}
+
+model Shortlink {
+  id        String   @id @default(cuid())
+  code      String   @unique
+  url       String
+  projectId String?  @map("project_id")
+  project   Project? @relation(fields: [projectId], references: [id])
+  clicks    Int      @default(0)
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([projectId])
+  @@index([clicks(sort: Desc)])
+  @@map("shortlinks")
 }
