@@ -1,9 +1,15 @@
-import { Controller, Get, Param } from '@nestjs/common';
+import { Controller, Get, Param, Post, Put, Body, UseGuards } from '@nestjs/common';
 import { PrismaService } from './prisma.service';
+import { AccountSecurityService } from './account-security.service';
+// TODO: Add admin guard
+// import { AdminGuard } from './guards/admin.guard';
 
 @Controller('api/user')
 export class UserController {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly accountSecurity: AccountSecurityService,
+  ) {}
 
   @Get(':id')
   async getUser(@Param('id') id: string) {
@@ -18,5 +24,63 @@ export class UserController {
       createdAt: user.createdAt,
       updatedAt: user.updatedAt,
     };
+  }
+
+  @Post(':id/freeze-request')
+  async submitFreezeRequest(
+    @Param('id') userId: string,
+    @Body() body: { reporterId: string; reason: string; evidenceUrl?: string },
+  ) {
+    return this.accountSecurity.submitFreezeRequest(
+      userId,
+      body.reporterId,
+      body.reason,
+      body.evidenceUrl,
+    );
+  }
+
+  @Get(':id/freeze-requests')
+  async getFreezeRequests(@Param('id') userId: string) {
+    return this.accountSecurity.getFreezeRequests(userId);
+  }
+
+  @Put('freeze-request/:requestId/review')
+  // @UseGuards(AdminGuard) // TODO: Add admin guard
+  async reviewFreezeRequest(
+    @Param('requestId') requestId: string,
+    @Body() body: { adminId: string; approved: boolean; adminNotes?: string },
+  ) {
+    return this.accountSecurity.reviewFreezeRequest(
+      requestId,
+      body.adminId,
+      body.approved,
+      body.adminNotes,
+    );
+  }
+
+  @Put(':id/unfreeze')
+  // @UseGuards(AdminGuard) // TODO: Add admin guard
+  async unfreezeAccount(
+    @Param('id') userId: string,
+    @Body() body: { adminId: string; reason: string },
+  ) {
+    return this.accountSecurity.unfreezeAccount(userId, body.adminId, body.reason);
+  }
+
+  @Get(':id/frozen-status')
+  async getFrozenStatus(@Param('id') userId: string) {
+    const isFrozen = await this.accountSecurity.isAccountFrozen(userId);
+    return { isFrozen };
+  }
+
+  @Get('freeze-requests/pending')
+  // @UseGuards(AdminGuard) // TODO: Add admin guard
+  async getPendingFreezeRequests() {
+    return this.accountSecurity.getPendingFreezeRequests();
+  }
+
+  @Post(':id/can-transact')
+  async canProceedWithTransaction(@Param('id') userId: string) {
+    return this.accountSecurity.canProceedWithTransaction(userId);
   }
 }
