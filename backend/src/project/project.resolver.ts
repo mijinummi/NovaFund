@@ -3,6 +3,7 @@ import { Throttle } from '@nestjs/throttler';
 import { ProjectService } from './project.service';
 import { Project } from './dto/project.dto';
 import { ProjectList } from './dto/project-list.dto';
+import { ProjectFilterInput } from './dto/project-filter.dto';
 
 @Resolver(() => Project)
 export class ProjectResolver {
@@ -25,8 +26,9 @@ export class ProjectResolver {
     @Args('take', { type: () => Int, nullable: true }) take?: number,
     @Args('status', { type: () => String, nullable: true }) status?: string,
     @Args('category', { type: () => String, nullable: true }) category?: string,
+    @Args('filter', { type: () => ProjectFilterInput, nullable: true }) filter?: ProjectFilterInput,
   ): Promise<ProjectList> {
-    return this.projectService.findAll({ skip, take, status, category });
+    return this.projectService.findAll({ skip, take, status, category, filter });
   }
 
   @Query(() => [Project], { name: 'activeProjects' })

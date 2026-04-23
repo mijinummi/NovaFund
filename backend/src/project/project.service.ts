@@ -90,6 +90,7 @@ export class ProjectService {
     take?: number;
     status?: string;
     category?: string;
+    filter?: any;
   } = {}): Promise<ProjectList> {
     const cacheKey = RedisService.getProjectListKey(filters);
     
@@ -100,11 +101,44 @@ export class ProjectService {
       return cachedResult;
     }
 
-    const { skip = 0, take = 20, status, category } = filters;
+    const { skip = 0, take = 20, status, category, filter } = filters;
 
     const where: any = {};
+    
+    // Handle legacy exact match filters
     if (status) where.status = status;
     if (category) where.category = category;
+
+    // Handle advanced filter operators
+    if (filter) {
+      if (filter.title) {
+        where.title = this.buildStringFilter(filter.title);
+      }
+      if (filter.description) {
+        where.description = this.buildStringFilter(filter.description);
+      }
+      if (filter.category) {
+        where.category = this.buildStringFilter(filter.category);
+      }
+      if (filter.status) {
+        where.status = this.buildStringFilter(filter.status);
+      }
+      if (filter.creatorId) {
+        where.creatorId = this.buildStringFilter(filter.creatorId);
+      }
+      if (filter.goal) {
+        where.goal = this.buildNumberFilter(filter.goal);
+      }
+      if (filter.currentFunds) {
+        where.currentFunds = this.buildNumberFilter(filter.currentFunds);
+      }
+      if (filter.deadline) {
+        where.deadline = this.buildDateFilter(filter.deadline);
+      }
+      if (filter.createdAt) {
+        where.createdAt = this.buildDateFilter(filter.createdAt);
+      }
+    }
 
     const [projects, total] = await Promise.all([
       this.prisma.project.findMany({
@@ -226,6 +260,97 @@ export class ProjectService {
       updatedAt: project.updatedAt.toISOString(),
       _count: project._count,
     };
+  }
+
+  /**
+   * Build Prisma filter from StringFilterInput
+   */
+  private buildStringFilter(filter: any): any {
+    const prismaFilter: any = {};
+    
+    if (filter.equals !== undefined) {
+      return filter.equals; // Simple equality
+    }
+    
+    if (filter.contains !== undefined) {
+      prismaFilter.contains = filter.contains;
+    }
+    
+    if (filter.in !== undefined && Array.isArray(filter.in)) {
+      prismaFilter.in = filter.in;
+    }
+    
+    if (filter.not !== undefined) {
+      prismaFilter.not = filter.not;
+    }
+    
+    return Object.keys(prismaFilter).length > 0 ? prismaFilter : undefined;
+  }
+
+  /**
+   * Build Prisma filter from FloatFilterInput or IntFilterInput
+   */
+  private buildNumberFilter(filter: any): any {
+    const prismaFilter: any = {};
+    
+    if (filter.equals !== undefined) {
+      return filter.equals;
+    }
+    
+    if (filter.gt !== undefined) {
+      prismaFilter.gt = filter.gt;
+    }
+    
+    if (filter.gte !== undefined) {
+      prismaFilter.gte = filter.gte;
+    }
+    
+    if (filter.lt !== undefined) {
+      prismaFilter.lt = filter.lt;
+    }
+    
+    if (filter.lte !== undefined) {
+      prismaFilter.lte = filter.lte;
+    }
+    
+    if (filter.in !== undefined && Array.isArray(filter.in)) {
+      prismaFilter.in = filter.in;
+    }
+    
+    return Object.keys(prismaFilter).length > 0 ? prismaFilter : undefined;
+  }
+
+  /**
+   * Build Prisma filter from DateTimeFilterInput
+   */
+  private buildDateFilter(filter: any): any {
+    const prismaFilter: any = {};
+    
+    if (filter.equals !== undefined) {
+      return new Date(filter.equals);
+    }
+    
+    if (filter.gt !== undefined) {
+      prismaFilter.gt = new Date(filter.gt);
+    }
+    
+    if (filter.gte !== undefined) {
+      prismaFilter.gte = new Date(filter.gte);
+    }
+    
+    if (filter.lt !== undefined) {
+      prismaFilter.lt = new Date(filter.lt);
+    }
+    
+    if (filter.lte !== undefined) {
+      prismaFilter.lte = new Date(filter.lte);
+    }
+    
+    if (filter.in !== undefined && Array.isArray(filter.in)) {
+      prismaFilter.in = filter.in.map((d: string) => new Date(d));
+    }
+    
+    return Object.keys(prismaFilter).length > 0 ? prismaFilter : undefined;
   }
 
   /**
