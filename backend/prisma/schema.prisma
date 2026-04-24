@@ -32,6 +32,10 @@ model User {
   notificationMatrix   NotificationMatrix[]
   notifications        Notification[]
   federationRecord     FederationRecord?
+  apiKeys              ApiKey[]
+  freezeReports        AccountFreezeRequest[] @relation("freezeReporter")
+  freezeRequests       AccountFreezeRequest[] @relation("freezeUser")
+  webhookSubscriptions WebhookSubscription[]
 
   @@map("users")
 }
@@ -276,10 +280,16 @@ model WebhookDelivery {
   @@map("webhook_deliveries")
 }
 
+enum FreezeRequestStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
 model AccountFreezeRequest {
   id          String              @id @default(cuid())
   userId      String              @map("user_id")
-  user        User                @relation(fields: [userId], references: [id])
+  user        User                @relation("freezeUser", fields: [userId], references: [id])
   reporterId  String?             @map("reporter_id")
   reporter    User?               @relation("freezeReporter", fields: [reporterId], references: [id])
   reason      String
@@ -302,13 +312,6 @@ enum WebhookDeliveryStatus {
   FAILED
 }
 
-model BridgeTransaction {
-  CONTRIBUTION
-  MILESTONE
-  DEADLINE
-  YIELD
-  SYSTEM
-}
 
 enum NotificationChannel {
   EMAIL
@@ -493,4 +496,16 @@ model FederationRecord {
   @@index([email])
   @@index([stellarPublicKey])
   @@map("federation_records")
+}
+
+model ApiKey {
+  id        String   @id @default(cuid())
+  key       String   @unique
+  userId    String   @map("user_id")
+  user      User     @relation(fields: [userId], references: [id])
+  scopes    String[] // e.g., ["investments:read", "milestones:update"]
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("api_keys")
 }

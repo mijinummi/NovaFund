@@ -1,7 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import {
-  Server as HorizonServer,
+  Horizon,
   Keypair,
   TransactionBuilder,
   Networks,
@@ -9,7 +9,6 @@ import {
   Asset,
   BASE_FEE,
 } from '@stellar/stellar-sdk';
-import { SorobanRpc } from '@stellar/stellar-sdk';
 import { RpcFallbackService } from './rpc-fallback.service';
 
 /**
@@ -69,7 +68,7 @@ export interface RouteAnalysis {
 @Injectable()
 export class PathfinderService {
   private readonly logger = new Logger(PathfinderService.name);
-  private horizonServer: HorizonServer;
+  private horizonServer: Horizon.Server;
   private readonly networkPassphrase: string;
 
   constructor(
@@ -83,10 +82,10 @@ export class PathfinderService {
     
     this.networkPassphrase = this.configService.get<string>(
       'STELLAR_NETWORK_PASSPHRASE',
-      Networks.TESTNET_NETWORK_PASSPHRASE,
+      Networks.TESTNET,
     );
 
-    this.horizonServer = new HorizonServer(horizonUrl);
+    this.horizonServer = new Horizon.Server(horizonUrl);
     this.logger.log(`PathfinderService initialized with Horizon: ${horizonUrl}`);
   }
 
@@ -121,9 +120,7 @@ export class PathfinderService {
       );
 
       // Query Stellar's path finding API
-      const pathResponse = await this.horizonServer.strictReceivePaths(sourceAsset, destinationAsset, [
-        { asset: destinationAsset, amount: sourceAmount },
-      ])
+      const pathResponse = await this.horizonServer.strictReceivePaths([sourceAsset], destinationAsset, sourceAmount)
         .limit(1)
         .call();
 
@@ -187,9 +184,7 @@ export class PathfinderService {
       );
 
       // Query multiple paths
-      const pathResponse = await this.horizonServer.strictReceivePaths(sourceAsset, destinationAsset, [
-        { asset: destinationAsset, amount: sourceAmount },
-      ])
+      const pathResponse = await this.horizonServer.strictReceivePaths([sourceAsset], destinationAsset, sourceAmount)
         .limit(pathCount)
         .call();
 
@@ -323,9 +318,7 @@ export class PathfinderService {
 
       // Try to find any path
       const pathResponse = await this.horizonServer
-        .strictReceivePaths(sourceAsset, destinationAsset, [
-          { asset: destinationAsset, amount: '1' },
-        ])
+        .strictReceivePaths([sourceAsset], destinationAsset, '1')
         .limit(1)
         .call();
 

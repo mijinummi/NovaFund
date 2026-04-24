@@ -1,6 +1,6 @@
 import { Controller, Get, Param, Post, Put, Body, UseGuards } from '@nestjs/common';
 import { PrismaService } from './prisma.service';
-import { AccountSecurityService } from './account-security.service';
+import { AccountSecurityService } from './user/account-security.service';
 // TODO: Add admin guard
 // import { AdminGuard } from './guards/admin.guard';
 

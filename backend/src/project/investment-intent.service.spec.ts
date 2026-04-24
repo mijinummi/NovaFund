@@ -359,7 +359,6 @@ describe('InvestmentIntentService', () => {
           projectId: 'project-1',
           status: InvestmentIntentStatus.PENDING,
           routeJson: mockRouteAnalysis,
-          projectId: 'project-1',
           investorId: 'investor-1',
           investmentAmount: BigInt(100),
           userAssetCode: 'EURC',

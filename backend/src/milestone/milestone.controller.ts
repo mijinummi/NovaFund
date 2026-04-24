@@ -1,4 +1,6 @@
-import { Controller, Patch, Param, Body } from '@nestjs/common';
+import { Controller, Patch, Param, Body, UseGuards } from '@nestjs/common';
+import { ApiKeyGuard } from '../guards/api-key.guard';
+import { Scopes } from '../decorators/scopes.decorator';
 import { MilestoneStatus } from '@prisma/client';
 import { MilestoneService } from './milestone.service';
 import { IsEnum } from 'class-validator';
@@ -20,6 +22,8 @@ export class MilestoneController {
    * dispatched to all project investors.
    */
   @Patch(':id/status')
+  @UseGuards(ApiKeyGuard)
+  @Scopes('milestones:update')
   async updateStatus(@Param('id') id: string, @Body() dto: UpdateMilestoneStatusDto) {
     return this.milestoneService.updateStatus(id, dto.status);
   }

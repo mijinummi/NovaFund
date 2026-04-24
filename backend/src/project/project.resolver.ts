@@ -1,13 +1,17 @@
 import { Resolver, Query, Args, Int } from '@nestjs/graphql';
 import { Throttle } from '@nestjs/throttler';
 import { ProjectService } from './project.service';
+import { TaggerService } from './tagger.service';
 import { Project } from './dto/project.dto';
 import { ProjectList } from './dto/project-list.dto';
 import { ProjectFilterInput } from './dto/project-filter.dto';
 
 @Resolver(() => Project)
 export class ProjectResolver {
-  constructor(private readonly projectService: ProjectService) {}
+  constructor(
+    private readonly projectService: ProjectService,
+    private readonly taggerService: TaggerService,
+  ) {}
 
   @Query(() => Project, { name: 'project' })
   async getProject(@Args('id') id: string): Promise<Project> {
@@ -44,5 +48,13 @@ export class ProjectResolver {
     @Args('limit', { type: () => Int, nullable: true }) limit?: number,
   ): Promise<Project[]> {
     return this.projectService.findByCreator(creatorId, limit);
+  }
+
+  @Query(() => [String], { name: 'suggestProjectTags' })
+  suggestProjectTags(
+    @Args('title') title: string,
+    @Args('description') description: string,
+  ): string[] {
+    return this.taggerService.suggestTags(title, description);
   }
 }
