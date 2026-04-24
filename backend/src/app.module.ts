@@ -20,6 +20,7 @@ import { OracleModule } from './oracle/oracle.module';
 import { GraphQLRateLimitModule } from './graphql/graphql-rate-limit.module';
 import { UserModule } from './user/user.module';
 import { ShortlinkModule } from './shortlink/shortlink.module';
+import { SupportModule } from './support/support.module';
 
 @Module({
   imports: [
@@ -48,6 +49,7 @@ import { ShortlinkModule } from './shortlink/shortlink.module';
     OracleModule,
     UserModule,
     ShortlinkModule,
+    SupportModule,
   ],
   controllers: [AppController],
   providers: [AppService],

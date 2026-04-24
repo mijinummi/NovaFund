@@ -121,6 +121,45 @@ class EnvironmentVariables {
   @IsOptional()
   @IsNumber()
   PRICE_FETCH_INTERVAL_MINUTES?: number;
+
+  // ─── Support / Live Chat Integration ───────────────────────────────
+  @IsOptional()
+  @IsString()
+  SUPPORT_DEFAULT_PROVIDER?: string; // INTERCOM | ZENDESK
+
+  // Intercom
+  @IsOptional()
+  @IsString()
+  INTERCOM_ACCESS_TOKEN?: string;
+
+  @IsOptional()
+  @IsString()
+  INTERCOM_WORKSPACE_ID?: string;
+
+  @IsOptional()
+  @IsString()
+  INTERCOM_ADMIN_ID?: string;
+
+  // Zendesk
+  @IsOptional()
+  @IsString()
+  ZENDESK_SUBDOMAIN?: string;
+
+  @IsOptional()
+  @IsString()
+  ZENDESK_EMAIL?: string;
+
+  @IsOptional()
+  @IsString()
+  ZENDESK_API_TOKEN?: string;
+
+  @IsOptional()
+  @IsString()
+  ZENDESK_AGENT_ID?: string;
+
+  @IsOptional()
+  @IsString()
+  ZENDESK_ON_CHAIN_CONTEXT_FIELD_ID?: string;
 }
 
 export function validateEnv(config: Record<string, unknown>) {

@@ -36,6 +36,7 @@ model User {
   freezeReports        AccountFreezeRequest[] @relation("freezeReporter")
   freezeRequests       AccountFreezeRequest[] @relation("freezeUser")
   webhookSubscriptions WebhookSubscription[]
+  supportTickets      SupportTicket[]
 
   @@map("users")
 }
@@ -508,4 +509,64 @@ model ApiKey {
   updatedAt DateTime @updatedAt @map("updated_at")
 
   @@map("api_keys")
+}
+
+enum SupportTicketPriority {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+enum SupportTicketStatus {
+  OPEN
+  IN_PROGRESS
+  WAITING_ON_USER
+  RESOLVED
+  CLOSED
+}
+
+enum SupportProvider {
+  INTERCOM
+  ZENDESK
+}
+
+model SupportTicket {
+  id              String                 @id @default(cuid())
+  userId          String                 @map("user_id")
+  user            User                   @relation(fields: [userId], references: [id])
+  subject         String
+  description     String
+  priority        SupportTicketPriority  @default(MEDIUM)
+  status          SupportTicketStatus    @default(OPEN)
+  provider        SupportProvider        @default(INTERCOM)
+  providerTicketId String?              @map("provider_ticket_id")
+  conversationUrl String?              @map("conversation_url")
+  onChainContext  Json?                  @map("on_chain_context")
+  assignedTo      String?                @map("assigned_to")
+  tags            String[]               @default([])
+  resolvedAt      DateTime?              @map("resolved_at")
+  createdAt       DateTime               @default(now()) @map("created_at")
+  updatedAt       DateTime               @updatedAt @map("updated_at")
+
+  messages        SupportMessage[]
+
+  @@index([userId])
+  @@index([status])
+  @@index([provider, providerTicketId])
+  @@map("support_tickets")
+}
+
+model SupportMessage {
+  id        String   @id @default(cuid())
+  ticketId  String   @map("ticket_id")
+  ticket    SupportTicket @relation(fields: [ticketId], references: [id])
+  senderId  String?  @map("sender_id")
+  senderRole String  @default("USER") // USER | AGENT | SYSTEM
+  body      String
+  attachments Json?
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([ticketId])
+  @@map("support_messages")
 }
