@@ -13,7 +13,7 @@ export class ProjectService {
     private readonly redisService: RedisService,
   ) {}
 
-  async findById(id: string): Promise<Project> {
+  async findById(id: string, requiredFields?: string[]): Promise<Project> {
     const cacheKey = RedisService.getProjectKey(id);
     
     // Try to get from cache first
@@ -23,17 +23,13 @@ export class ProjectService {
       return cachedProject;
     }
 
+    // Build select object based on required fields
+    const select = this.buildSelectObject(requiredFields);
+
     // If not in cache, fetch from database
     const project = await this.prisma.project.findUnique({
       where: { id },
-      include: {
-        _count: {
-          select: {
-            contributions: true,
-            milestones: true,
-          },
-        },
-      },
+      select,
     });
 
     if (!project) {
@@ -50,7 +46,7 @@ export class ProjectService {
     return transformedProject;
   }
 
-  async findByContractId(contractId: string): Promise<Project> {
+  async findByContractId(contractId: string, requiredFields?: string[]): Promise<Project> {
     const cacheKey = `project:contract:${contractId}`;
     
     // Try to get from cache first
@@ -60,16 +56,12 @@ export class ProjectService {
       return cachedProject;
     }
 
+    // Build select object based on required fields
+    const select = this.buildSelectObject(requiredFields);
+
     const project = await this.prisma.project.findUnique({
       where: { contractId },
-      include: {
-        _count: {
-          select: {
-            contributions: true,
-            milestones: true,
-          },
-        },
-      },
+      select,
     });
 
     if (!project) {
@@ -91,7 +83,7 @@ export class ProjectService {
     status?: string;
     category?: string;
     filter?: any;
-  } = {}): Promise<ProjectList> {
+  } = {}, requiredFields?: string[]): Promise<ProjectList> {
     const cacheKey = RedisService.getProjectListKey(filters);
     
     // Try to get from cache first
@@ -140,19 +132,15 @@ export class ProjectService {
       }
     }
 
+    // Build select object based on required fields
+    const select = this.buildSelectObject(requiredFields);
+
     const [projects, total] = await Promise.all([
       this.prisma.project.findMany({
         where,
         skip,
         take,
-        include: {
-          _count: {
-            select: {
-              contributions: true,
-              milestones: true,
-            },
-          },
-        },
+        select,
         orderBy: { createdAt: 'desc' },
       }),
       this.prisma.project.count({ where }),
@@ -174,7 +162,7 @@ export class ProjectService {
     return result;
   }
 
-  async findActiveProjects(limit?: number): Promise<Project[]> {
+  async findActiveProjects(limit?: number, requiredFields?: string[]): Promise<Project[]> {
     const cacheKey = `projects:active:${limit || 'all'}`;
     
     // Try to get from cache first
@@ -184,17 +172,13 @@ export class ProjectService {
       return cachedProjects;
     }
 
+    // Build select object based on required fields
+    const select = this.buildSelectObject(requiredFields);
+
     const projects = await this.prisma.project.findMany({
       where: { status: 'ACTIVE' },
       take: limit || undefined,
-      include: {
-        _count: {
-          select: {
-            contributions: true,
-            milestones: true,
-          },
-        },
-      },
+      select,
       orderBy: { createdAt: 'desc' },
     });
 
@@ -207,7 +191,7 @@ export class ProjectService {
     return transformedProjects;
   }
 
-  async findByCreator(creatorId: string, limit?: number): Promise<Project[]> {
+  async findByCreator(creatorId: string, limit?: number, requiredFields?: string[]): Promise<Project[]> {
     const cacheKey = RedisService.getUserProjectsKey(creatorId) + `:${limit || 'all'}`;
     
     // Try to get from cache first
@@ -217,17 +201,13 @@ export class ProjectService {
       return cachedProjects;
     }
 
+    // Build select object based on required fields
+    const select = this.buildSelectObject(requiredFields);
+
     const projects = await this.prisma.project.findMany({
       where: { creatorId },
       take: limit || undefined,
-      include: {
-        _count: {
-          select: {
-            contributions: true,
-            milestones: true,
-          },
-        },
-      },
+      select,
       orderBy: { createdAt: 'desc' },
     });
 
@@ -251,15 +231,80 @@ export class ProjectService {
       title: project.title,
       description: project.description,
       category: project.category,
-      goal: Number(project.goal),
-      currentFunds: Number(project.currentFunds),
-      deadline: project.deadline.toISOString(),
+      goal: project.goal ? Number(project.goal) : 0,
+      currentFunds: project.currentFunds ? Number(project.currentFunds) : 0,
+      deadline: project.deadline ? project.deadline.toISOString() : '',
       ipfsHash: project.ipfsHash,
       status: project.status,
-      createdAt: project.createdAt.toISOString(),
-      updatedAt: project.updatedAt.toISOString(),
+      createdAt: project.createdAt ? project.createdAt.toISOString() : '',
+      updatedAt: project.updatedAt ? project.updatedAt.toISOString() : '',
       _count: project._count,
     };
+  }
+
+  /**
+   * Build Prisma select object based on required GraphQL fields
+   */
+  private buildSelectObject(requiredFields?: string[]): any {
+    if (!requiredFields || requiredFields.length === 0) {
+      // Default select - include all fields and counts
+      return {
+        id: true,
+        contractId: true,
+        creatorId: true,
+        title: true,
+        description: true,
+        category: true,
+        goal: true,
+        currentFunds: true,
+        deadline: true,
+        ipfsHash: true,
+        status: true,
+        createdAt: true,
+        updatedAt: true,
+        _count: {
+          select: {
+            contributions: true,
+            milestones: true,
+          },
+        },
+      };
+    }
+
+    const select: any = {};
+
+    // Map GraphQL fields to database fields
+    const fieldMapping: { [key: string]: string } = {
+      id: 'id',
+      contractId: 'contractId',
+      creatorId: 'creatorId',
+      title: 'title',
+      description: 'description',
+      category: 'category',
+      goal: 'goal',
+      currentFunds: 'currentFunds',
+      deadline: 'deadline',
+      ipfsHash: 'ipfsHash',
+      status: 'status',
+      createdAt: 'createdAt',
+      updatedAt: 'updatedAt',
+    };
+
+    // Add required fields
+    requiredFields.forEach(field => {
+      if (fieldMapping[field]) {
+        select[fieldMapping[field]] = true;
+      } else if (field === '_count') {
+        select._count = {
+          select: {
+            contributions: true,
+            milestones: true,
+          },
+        };
+      }
+    });
+
+    return select;
   }
 
   /**
