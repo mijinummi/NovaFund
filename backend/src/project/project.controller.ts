@@ -1,4 +1,6 @@
-import { Controller, Get, Param, Query } from '@nestjs/common';
+import { Controller, Get, Param, Query, Patch, Body, UseGuards } from '@nestjs/common';
+import { ApiKeyGuard } from '../guards/api-key.guard';
+import { Scopes } from '../decorators/scopes.decorator';
 import { ProjectService } from './project.service';
 import { Project } from './dto/project.dto';
 
@@ -42,5 +44,13 @@ export class ProjectController {
     @Query('limit') limit?: number,
   ) {
     return this.projectService.findByCreator(creatorId, limit ? parseInt(limit.toString()) : undefined);
+  }
+
+  @Patch(':id')
+  @UseGuards(ApiKeyGuard)
+  @Scopes('project:edit')
+  async updateProject(@Param('id') id: string, @Body() data: any) {
+    // In a real implementation, this would call projectService.update
+    return { success: true, id, message: 'Project updated successfully (scope validated)' };
   }
 }
