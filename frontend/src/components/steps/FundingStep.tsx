@@ -2,6 +2,7 @@
 
 import { ProjectFormData, ValidationErrors } from '@/types/project';
 import { DollarSign, Calendar, Wallet } from 'lucide-react';
+import { Term } from '@/components/ui';
 
 interface FundingStepProps {
   data: ProjectFormData;
@@ -99,7 +100,7 @@ export default function FundingStep({ data, errors, onChange }: FundingStepProps
       {/* Stellar Wallet Address */}
       <div>
         <label htmlFor="walletAddress" className="block text-sm font-medium text-white/90 mb-2">
-          Stellar Wallet Address <span className="text-red-400">*</span>
+          <Term termKey="wallet" side="top" /> <span className="text-red-400">*</span>
         </label>
         <div className="relative">
           <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
@@ -122,7 +123,7 @@ export default function FundingStep({ data, errors, onChange }: FundingStepProps
           <p className="text-sm text-red-500 mt-1">{errors.walletAddress}</p>
         )}
         <p className="text-xs text-white/40 mt-1">
-          Your Stellar public address where funds will be received. Must start with &apos;G&apos;.
+          Your <Term termKey="stellar" side="right" /> public address where funds will be received. Must start with &apos;G&apos;.
         </p>
       </div>
 
@@ -135,7 +136,7 @@ export default function FundingStep({ data, errors, onChange }: FundingStepProps
             </svg>
           </div>
           <div>
-            <h4 className="text-sm font-medium text-white/90">All-or-nothing funding</h4>
+            <h4 className="text-sm font-medium text-white/90"><Term termKey="allOrNothing" side="right" /></h4>
             <p className="text-sm text-white/60 mt-1">
               Funds are only released if you reach your goal within the specified duration. 
               This protects backers and ensures you have enough to deliver.

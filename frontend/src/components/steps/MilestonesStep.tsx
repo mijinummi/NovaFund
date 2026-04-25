@@ -3,6 +3,7 @@
 import { ProjectFormData, Milestone, ValidationErrors } from '@/types/project';
 import { Plus, Trash2, Calendar } from 'lucide-react';
 import { useState } from 'react';
+import { Term } from '@/components/ui';
 
 interface MilestonesStepProps {
   data: ProjectFormData;
@@ -43,7 +44,9 @@ export default function MilestonesStep({ data, errors, onChange }: MilestonesSte
   return (
     <div className="space-y-6">
       <div>
-        <h2 className="text-3xl font-semibold text-white">Project Milestones</h2>
+        <h2 className="text-3xl font-semibold text-white">
+          Project <Term termKey="milestone" side="right" />
+        </h2>
         <p className="mt-2 text-white/60 text-base">
           Break your project into key milestones. This builds trust and shows backers your roadmap.
         </p>
@@ -206,11 +209,13 @@ export default function MilestonesStep({ data, errors, onChange }: MilestonesSte
             </svg>
           </div>
           <div>
-            <h4 className="text-sm font-medium text-white/90">Milestone Tips</h4>
+            <h4 className="text-sm font-medium text-white/90">
+              <Term termKey="milestone" side="top" /> Tips
+            </h4>
             <ul className="text-sm text-white/50 mt-1 space-y-1 list-disc list-inside">
               <li>Funding percentages must total exactly 100%</li>
-              <li>Break complex projects into 3-5 manageable milestones</li>
-              <li>Clear milestones increase backer confidence</li>
+              <li>Break complex projects into 3-5 manageable <Term termKey="milestone" side="left" />s</li>
+              <li>Clear <Term termKey="milestone" side="left" />s increase backer confidence and trigger <Term termKey="smartContract" side="bottom" /> releases</li>
             </ul>
           </div>
         </div>
