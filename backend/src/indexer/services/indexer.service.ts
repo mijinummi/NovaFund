@@ -155,6 +155,14 @@ export class IndexerService implements OnModuleInit, OnModuleDestroy {
       // Get latest ledger from network
       const latestLedger = await this.getLatestLedger();
 
+      // Handle re-orgs: if latest ledger is behind cursor, reset cursor
+      if (cursor && latestLedger < cursor.lastLedgerSeq) {
+        const newCursor = Math.max(1, latestLedger - 10);
+        this.logger.warn(`Re-org detected. Resetting cursor from ${cursor.lastLedgerSeq} to ${newCursor}`);
+        await this.ledgerTracker.updateCursor(newCursor);
+        return;
+      }
+
       // Check if there's anything to process
       if (startLedger > latestLedger) {
         this.logger.debug(`No new ledgers. Current: ${startLedger - 1}, Latest: ${latestLedger}`);
