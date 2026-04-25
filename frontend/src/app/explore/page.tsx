@@ -6,6 +6,8 @@ import { Search, ChevronDown, Filter } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { cn } from "@/lib/utils";
 
+import { useRouter, usePathname, useSearchParams } from "next/navigation";
+
 const MOCK_PROJECTS: Project[] = [
   {
     id: "1",
@@ -123,15 +125,41 @@ const MOCK_PROJECTS: Project[] = [
 
 type SortOption = "Newest" | "Ending Soon" | "Most Funded";
 
-export default function ExplorePage() {
-  const [searchQuery, setSearchQuery] = useState("");
-  const [debouncedSearch, setDebouncedSearch] = useState("");
-  const [sortBy, setSortBy] = useState<SortOption>("Newest");
-  const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
-  const [fundingStage, setFundingStage] = useState<string>("");
+function ExploreContent() {
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+
+  const [searchQuery, setSearchQuery] = useState(searchParams.get("q") || "");
+  const [debouncedSearch, setDebouncedSearch] = useState(searchParams.get("q") || "");
+  const [sortBy, setSortBy] = useState<SortOption>((searchParams.get("sort") as SortOption) || "Newest");
+  const [selectedCategories, setSelectedCategories] = useState<string[]>(searchParams.getAll("category") || []);
+  const [fundingStage, setFundingStage] = useState<string>(searchParams.get("stage") || "");
   const [maxDaysLeft, setMaxDaysLeft] = useState<number | null>(null);
   const [minSuccessProb, setMinSuccessProb] = useState<number>(0);
   const [isSortOpen, setIsSortOpen] = useState(false);
+
+  useEffect(() => {
+    const params = new URLSearchParams(Array.from(searchParams.entries()));
+    
+    if (debouncedSearch) params.set("q", debouncedSearch);
+    else params.delete("q");
+
+    if (sortBy !== "Newest") params.set("sort", sortBy);
+    else params.delete("sort");
+
+    params.delete("category");
+    selectedCategories.forEach(c => params.append("category", c));
+
+    if (fundingStage) params.set("stage", fundingStage);
+    else params.delete("stage");
+
+    const currentQuery = searchParams.toString();
+    const newQuery = params.toString();
+    if (currentQuery !== newQuery) {
+      router.replace(`${pathname}?${newQuery}`, { scroll: false });
+    }
+  }, [debouncedSearch, sortBy, selectedCategories, fundingStage, pathname, router, searchParams]);
 
   const filteredAndSortedProjects = useMemo(() => {
     const q = debouncedSearch.trim().toLowerCase();
@@ -370,5 +398,17 @@ export default function ExplorePage() {
         </div>
       </main>
     </div>
+  );
+}
+
+export default function ExplorePage() {
+  return (
+    <React.Suspense fallback={
+      <div className="flex items-center justify-center min-h-screen bg-[#050505]">
+        <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin"></div>
+      </div>
+    }>
+      <ExploreContent />
+    </React.Suspense>
   );
 }
