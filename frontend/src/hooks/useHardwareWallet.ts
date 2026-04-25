@@ -109,9 +109,6 @@ export function useHardwareWallet(): UseHardwareWalletReturn {
 
   // ── Helpers ────────────────────────────────────────────────────────────────
 
-  const setLoading = (loading: boolean) =>
-    setState((prev) => ({ ...prev, isLoading: loading }));
-
   const setError = (message: string) =>
     setState({
       status: "error",
@@ -120,11 +117,10 @@ export function useHardwareWallet(): UseHardwareWalletReturn {
       isLoading: false,
     });
 
-  const handleTransportError = (err: unknown) => {
+  const handleTransportError = useCallback((err: unknown) => {
     const message =
       err instanceof Error ? err.message : "Unknown hardware wallet error.";
 
-    // Detect "device disconnected" flavour errors from the Ledger SDK
     const isDisconnect =
       message.toLowerCase().includes("disconnected") ||
       message.toLowerCase().includes("device not found") ||
@@ -141,7 +137,7 @@ export function useHardwareWallet(): UseHardwareWalletReturn {
     } else {
       setError(message);
     }
-  };
+  }, []);
 
   // ── connect ────────────────────────────────────────────────────────────────
 
@@ -205,7 +201,7 @@ export function useHardwareWallet(): UseHardwareWalletReturn {
       }
       handleTransportError(err);
     }
-  }, [isSupported]);
+  }, [isSupported, handleTransportError]);
 
   // ── signTransaction ────────────────────────────────────────────────────────
 
